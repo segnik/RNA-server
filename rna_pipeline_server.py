@@ -55,7 +55,7 @@ def spatial_scatter(ax, coords, c, title, s=5, cmap='tab10', **kw):
     ax.set_title(title); ax.set_aspect('equal'); ax.set_xticks([]); ax.set_yticks([])
     return sc_
 
-def save_show(fig, R(fname), dpi=150:
+def save_show(fig, fname, dpi=150):
     fig.tight_layout(pad=2.5)
     fig.savefig(fname, dpi=dpi, bbox_inches='tight'); plt.show(); plt.close(fig)
 
@@ -114,7 +114,7 @@ if 'spatial' in adata.obsm:
             axes[1].scatter(coords[m, 0], coords[m, 1], c=[clrs[i]], s=5, alpha=0.7, label=org)
         axes[1].set_title('Organoid Identity'); axes[1].set_aspect('equal')
         axes[1].legend(bbox_to_anchor=(1.05,1), loc='upper left')
-    save_show(fig, R('spatial_clusters.png')
+    save_show(fig, R('spatial_clusters.png'))
 
     # 7b: cluster composition
     if 'orig.ident' in adata.obs.columns:
@@ -123,7 +123,7 @@ if 'spatial' in adata.obsm:
         fig, ax = plt.subplots(figsize=(10, 6))
         cluster_by_organoid.T.plot(kind='bar', stacked=True, ax=ax, colormap='tab10')
         ax.set_title('Cluster Composition by Organoid'); ax.legend(title='Cluster', bbox_to_anchor=(1.05,1))
-        save_show(fig, R('cluster_composition.png')
+        save_show(fig, R('cluster_composition.png'))
 
     # 7c: spatial metrics
     spatial_metrics = []
@@ -149,7 +149,7 @@ if 'spatial' in adata.obsm:
         axes[i].scatter(coords[m, 0], coords[m, 1], c='red', s=2, alpha=0.5)
         axes[i].set_title(f'Cluster {cl}'); axes[i].set_aspect('equal')
     for j in range(i+1, len(axes)): axes[j].set_visible(False)
-    save_show(fig, R('cluster_distribution.png')
+    save_show(fig, R('cluster_distribution.png'))
 
     # 7e: radial zones
     center = coords.mean(axis=0)
@@ -161,7 +161,7 @@ if 'spatial' in adata.obsm:
         ax.hist(adata.obs.loc[adata.obs['leiden']==cl, 'distance_from_center'],
                 bins=50, alpha=0.5, label=f'Cluster {cl}')
     ax.set(xlabel='Distance from Center', ylabel='Spots'); ax.legend()
-    save_show(fig, R('radial_distribution.png')
+    save_show(fig, R('radial_distribution.png'))
 
     sc.tl.rank_genes_groups(adata, 'spatial_zone', method='wilcoxon', use_raw=False)
     sc.pl.rank_genes_groups_dotplot(adata, n_genes=5, title='Spatial Zone Markers')
@@ -301,7 +301,7 @@ if 'cluster_by_organoid' in dir():
     ax6.set_title('F: Cluster Composition', fontweight='bold')
     ax6.legend(title='Cluster', bbox_to_anchor=(1.05,1))
 
-save_show(fig, R('publication_figure.png'), dpi=300
+save_show(fig, R('publication_figure.png'), dpi=300)
 
 # ── STEP 14: spatial marker expression ───────────────────────
 step(14, "SPATIAL EXPRESSION OF KEY MARKERS")
@@ -319,7 +319,7 @@ if avail_nm and 'spatial' in adata.obsm:
         sc_ = spatial_scatter(axes[i], coords, e, f'{mk} Expression', cmap='viridis', vmin=0, vmax=1)
         plt.colorbar(sc_, ax=axes[i])
     for j in range(i+1, len(axes)): axes[j].set_visible(False)
-    save_show(fig, R('spatial_marker_expression.png')
+    save_show(fig, R('spatial_marker_expression.png'))
 
     if 'COL1A1' in avail_nm:
         e = get_exp(adata, 'COL1A1')
@@ -328,7 +328,7 @@ if avail_nm and 'spatial' in adata.obsm:
         spatial_scatter(a2, coords, adata.obs['leiden'].astype('category').cat.codes, 'Clusters + COL1A1 High')
         hi = e > np.percentile(e, 90)
         a2.scatter(coords[hi,0], coords[hi,1], c='red', s=10, alpha=0.8, label='COL1A1 >90th %ile')
-        a2.legend(); save_show(fig, R('COL1A1_detailed.png')
+        a2.legend(); save_show(fig, R('COL1A1_detailed.png'))
         print(f"COL1A1: mean={e.mean():.4f}, max={e.max():.4f}, %expressing={(e>0).mean()*100:.1f}%")
 
 # ── STEP 15: additional visualisations ───────────────────────
@@ -365,7 +365,7 @@ try:
     for ax, col, title in zip(axes, ['spatial_domain','leiden'],
                                ['SpaGCN Domains','Leiden Clusters']):
         spatial_scatter(ax, adata.obsm['spatial'], adata.obs[col].astype('category').cat.codes, title)
-    save_show(fig, R('spatial_domains_comparison.png')
+    save_show(fig, R('spatial_domains_comparison.png'))
     cross_tab = pd.crosstab(adata.obs['leiden'], adata.obs['spatial_domain'])
     cross_tab.to_csv(R('leiden_vs_spatial_domains.csv')); print(cross_tab)
     sc.tl.rank_genes_groups(adata, 'spatial_domain', method='wilcoxon', use_raw=False)
@@ -390,13 +390,14 @@ try:
     top20 = mr.nsmallest(20, 'pval_norm'); print(top20[['I','pval_norm',gene_col]])
     mr.to_csv(R('spatially_variable_genes.csv'))
     fig, axes = plt.subplots(2,3,figsize=(21,14)); axes = axes.flatten()
+    for i, gene in enumerate(top20[gene_col].tolist()[:6]):
         if gene in adata.var_names:
             e = get_exp(adata, gene)
             sc_ = axes[i].scatter(coords[:,0], coords[:,1], c=e, cmap='viridis', s=3, alpha=0.7)
             axes[i].set_title(f"{gene}\nI={mr.loc[mr[gene_col]==gene,'I'].values[0]:.3f}")
             axes[i].set_aspect('equal'); plt.colorbar(sc_, ax=axes[i])
     for j in range(i+1,6): axes[j].set_visible(False)
-    save_show(fig, R('spatially_variable_genes.png')
+    save_show(fig, R('spatially_variable_genes.png'))
     top10 = mr.nsmallest(10,'pval_norm')
     fig, ax = plt.subplots(figsize=(10,6))
     bars = ax.barh(range(10), top10['I'].values)
@@ -404,7 +405,7 @@ try:
     ax.set_xlabel("Moran's I"); ax.set_title('Top 10 Spatially Variable Genes')
     for bar, pv in zip(bars, top10['pval_norm'].values):
         bar.set_color('darkred' if pv<.001 else 'red' if pv<.01 else 'salmon' if pv<.05 else 'gray')
-    save_show(fig, R('top_spatial_genes_barplot.png')
+    save_show(fig, R('top_spatial_genes_barplot.png'))
 except ImportError: print("squidpy not installed: pip install squidpy")
 except Exception as e: import traceback; print(e); traceback.print_exc()
 
@@ -424,7 +425,7 @@ try:
     for i, col in enumerate(ms.columns[:6]):
         sc_ = axes[i].scatter(coords[:,0], coords[:,1], c=ms[col], cmap='RdBu_r', s=3, alpha=0.7)
         axes[i].set_title(f'Module {i}'); axes[i].set_aspect('equal'); plt.colorbar(sc_, ax=axes[i])
-    save_show(fig, R('hotspot_modules.png')
+    save_show(fig, R('hotspot_modules.png'))
 except ImportError: print("hotspot not installed: pip install hotspot")
 
 # ── STEP 20: spatial domain reproducibility ───────────────────
@@ -435,7 +436,7 @@ if 'spatial_domain' in adata.obs.columns and 'orig.ident' in adata.obs.columns:
     dbp = dbo.div(dbo.sum(axis=0), axis=1)
     fig, axes = plt.subplots(1,2,figsize=(18,8))
     dbp.T.plot(kind='bar', stacked=True, ax=axes[1], colormap='tab10', title='Proportions')
-    save_show(fig, R('spatial_domain_reproducibility.png')
+    save_show(fig, R('spatial_domain_reproducibility.png'))
     from scipy.stats import chi2_contingency
     _, p, *_ = chi2_contingency(dbo)
     print(f"Chi-square p={p:.4f} → {'sig diff' if p<0.05 else 'reproducible'}")
@@ -546,7 +547,7 @@ for ax, mask_, col, title_ in [
         ax.scatter(coords[fibro_mask,0],  coords[fibro_mask,1],  c='blue', s=10, alpha=0.8, label='Fibro')
         ax.legend()
     ax.set_title(title_); ax.set_aspect('equal')
-save_show(fig, R('motor_vs_fibroblast_analysis.png')
+save_show(fig, R('motor_vs_fibroblast_analysis.png'))
 
 # Motor marker stats
 motor_genes_rows = [{'gene': g, 'score': result_neuronal['scores'][top_motor_cluster][i],
@@ -612,7 +613,7 @@ m_p = cs[top_motor_cluster]/len(adata)*100; f_p = cs[top_fibro_cluster]/len(adat
 ax6.pie([m_p, f_p, 100-m_p-f_p], labels=['Motor','Fibro','Other'],
         colors=['red','blue','lightgray'], autopct='%1.1f%%')
 ax6.set_title('F: Tissue Composition', fontweight='bold')
-save_show(fig, R('motor_neuron_publication_figure.png'), dpi=300
+save_show(fig, R('motor_neuron_publication_figure.png'), dpi=300)
 
 # ── STEP 22b: Neuronal subtype analysis ──────────────────────
 subtype_markers = {
@@ -649,7 +650,7 @@ if subtype_scores_d:
         ax.axvline(xi, color='red', lw=2, ls='--', alpha=0.5)
     plt.colorbar(im, ax=ax, label='Mean Expression')
     ax.set_title('Neuronal Subtype Scores', fontweight='bold')
-    save_show(fig, R('neuronal_subtype_heatmap.png')
+    save_show(fig, R('neuronal_subtype_heatmap.png'))
 
 # ── Skeletal muscle ───────────────────────────────────────────
 skeletal_markers = {
@@ -670,12 +671,12 @@ if len(all_muscle) >= 2:
     ax.scatter(coords[:,0], coords[:,1], c='lightgray', s=3, alpha=0.3)
     ax.scatter(coords[mm,0], coords[mm,1], c='green', s=10, alpha=0.8, label=f'Muscle {top_muscle}')
     ax.set_title(f'Skeletal Muscle Cluster {top_muscle}'); ax.legend()
-    save_show(fig, R('skeletal_muscle_spatial.png')
+    save_show(fig, R('skeletal_muscle_spatial.png'))
 
 # ── TARDBP / ALS analysis ────────────────────────────────────
 step(22, "TARDBP + ALS GENE ANALYSIS")
 als_groups = {
-    'ALS_Core':   ['TARDBP','FUS','OPTN','SOD1','NEK1','TBK1','CHMP2B','UNC13A'],
+    'ALS_Core':   ['TARDBP','C9orf72','FUS','OPTN','SOD1','NEK1','TBK1','CHMP2B','UNC13A'],
     'FTD_Core':   ['MAPT','GRN','TMEM106B'],
     'HOX_Spinal': ['HOXA7','HOXA10','HOXA11'],
     'Signaling':  ['STK10','MAP4K3','EFR3A','EPHA4'],
@@ -711,7 +712,7 @@ if all_als:
         axes[2].set_yticks(range(len(all_als))); axes[2].set_yticklabels(all_als)
         plt.colorbar(im, ax=axes[2])
         axes[2].set_title('ALS Gene Correlation')
-    save_show(fig, R('ALS_genes_barplot.png')
+    save_show(fig, R('ALS_genes_barplot.png'))
 
     n_cols = min(3, len(all_als)); n_rows = (len(all_als)+n_cols-1)//n_cols
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(7*n_cols, 7*n_rows))
@@ -721,7 +722,7 @@ if all_als:
         sc_ = spatial_scatter(axes[i], coords, e, f'{gene} Expression', cmap='Reds', vmin=0, vmax=vmax)
         plt.colorbar(sc_, ax=axes[i])
     for j in range(i+1, len(axes)): axes[j].set_visible(False)
-    save_show(fig, R('ALS_genes_spatial.png')
+    save_show(fig, R('ALS_genes_spatial.png'))
 
     if 'orig.ident' in adata.obs.columns and 'TARDBP' in adata.var_names:
         e = get_exp(adata, 'TARDBP')
@@ -742,7 +743,7 @@ print(adata.obs['organoid'].value_counts())
 fig, axes = plt.subplots(1,2,figsize=(14,6))
 spatial_scatter(axes[0], coords, adata.obs['leiden'].astype('category').cat.codes, 'Original Clusters')
 sc_ = spatial_scatter(axes[1], coords, adata.obs['organoid'].astype('category').cat.codes, 'K-means Organoids', cmap='Set1')
-plt.colorbar(sc_, ax=axes[1]); save_show(fig, R('organoid_separation.png')
+plt.colorbar(sc_, ax=axes[1]); save_show(fig, R('organoid_separation.png'))
 
 # Motor abundance by organoid
 from scipy.stats import chi2_contingency, f_oneway, ttest_ind
@@ -782,7 +783,7 @@ for i, org in enumerate(organoids[:4]):
     axes[i].scatter(coords[om,0], coords[om,1], c='lightgray', s=3, alpha=0.3)
     axes[i].scatter(coords[mm,0], coords[mm,1], c=org_colors[i], s=10, alpha=0.8, label='Motor')
     axes[i].set_title(org); axes[i].set_aspect('equal'); axes[i].legend()
-save_show(fig, R('motor_neurons_by_organoid.png')
+save_show(fig, R('motor_neurons_by_organoid.png'))
 
 if 'SLC5A7' in adata.var_names:
     fig, ax = plt.subplots(figsize=(10,6))
@@ -792,7 +793,7 @@ if 'SLC5A7' in adata.var_names:
     if p_anova < .05:
         ax.text(0.5, 0.95, f'ANOVA: p={p_anova:.4f}', transform=ax.transAxes,
                 ha='center', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-    save_show(fig, R('slc5a7_by_organoid_boxplot.png')
+    save_show(fig, R('slc5a7_by_organoid_boxplot.png'))
 
 # ── Cell type assignment + custom UMAPs ──────────────────────
 step(24, "CUSTOM COLORED UMAPS PER ORGANOID")
@@ -841,7 +842,7 @@ for org in organoids:
     axes[1].set_xticks([]); axes[1].set_yticks([])
     axes[1].legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=9)
 
-    save_show(fig, R(f'umap_{org}_colored.png'), dpi=300
+    save_show(fig, R(f'umap_{org}_colored.png'), dpi=300)
 
 # ── Side-by-side: CLUSTERS ──
 fig, axes = plt.subplots(2, 2, figsize=(20, 18)); axes = axes.flatten()
@@ -852,7 +853,7 @@ for i, org in enumerate(organoids[:4]):
     sc.pl.umap(sub, color='leiden_neuronal', ax=axes[i], show=False,
                title=org, legend_loc='on data', legend_fontsize=7)
 plt.suptitle('Clusters Across Organoids', fontsize=18, fontweight='bold', y=1.01)
-save_show(fig, R('umap_all_organoids_clusters.png'), dpi=300
+save_show(fig, R('umap_all_organoids_clusters.png'), dpi=300)
 
 # ── Side-by-side: CELL TYPES ──
 fig, axes = plt.subplots(2, 2, figsize=(20, 18)); axes = axes.flatten()
@@ -872,7 +873,7 @@ fig.legend(handles=handles, bbox_to_anchor=(0.5, 0.0), loc='lower center',
            ncol=min(4, len(unique_cts)), frameon=True)
 plt.suptitle('Cell Types Across Organoids', fontsize=18, fontweight='bold', y=1.01)
 plt.tight_layout(rect=[0, 0.05, 1, 0.97])
-save_show(fig, R('umap_all_organoids_comparison.png'), dpi=300
+save_show(fig, R('umap_all_organoids_comparison.png'), dpi=300)
 
 # Per-gene comparison
 key_genes = [g for g in ['SLC5A7','BCL11B','SNAP25','GRIA2','SLC32A1','COL1A1','COL3A1',
@@ -887,7 +888,7 @@ for gene in key_genes:
         except:
             axes[i].text(0.5,0.5,f'{gene}\nerror',ha='center',va='center')
     plt.suptitle(f'{gene} Across Organoids', fontsize=16, fontweight='bold')
-    plt.tight_layout(); save_show(fig, R(f'umap_comparison_{gene}.png'), dpi=300
+    plt.tight_layout(); save_show(fig, R(f'umap_comparison_{gene}.png'), dpi=300)
 
 # ── Organoid similarity ───────────────────────────────────────
 step(25, "COMPREHENSIVE ORGANOID SIMILARITY ANALYSIS")
@@ -925,7 +926,7 @@ print("Euclidean dist:\n", edf.round(3))
 lm = linkage(fs, method='ward')
 fig, ax = plt.subplots(figsize=(10,5))
 dendrogram(lm, labels=list(organoids), ax=ax)
-ax.set_title('Organoid Hierarchical Clustering'); save_show(fig, R('organoid_comprehensive_clustering.png')
+ax.set_title('Organoid Hierarchical Clustering'); save_show(fig, R('organoid_comprehensive_clustering.png'))
 
 pca = PCA(n_components=2); pr = pca.fit_transform(fs)
 fig, ax = plt.subplots(figsize=(8,7))
@@ -934,7 +935,7 @@ for i, org in enumerate(organoids): ax.annotate(org, pr[i], fontsize=12, fontwei
 ax.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)')
 ax.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)')
 ax.set_title('PCA of Organoids'); ax.grid(alpha=0.3)
-save_show(fig, R('organoid_comprehensive_pca.png')
+save_show(fig, R('organoid_comprehensive_pca.png'))
 
 # Combined similarity + ranking
 norm_dist = (ed/ed.max() + md/md.max() + (1-cs)/1) / 3
@@ -951,16 +952,58 @@ print(f"📉 LEAST SIMILAR: {pairs_df.iloc[-1]['pair']}")
 step(26, "SPATIALLY VARIABLE GENE DETECTION (Multi-method)")
 try:
     import squidpy as sq
-    if 'spatial_neighbors' not in adata.uns:
-        sq.gr.spatial_neighbors(adata, coord_type='generic', n_neighs=6)
-    n_test = min(2000, adata.shape[1])
-    sq.gr.spatial_autocorr(adata, mode='moran', genes=adata.var_names[:n_test], n_perms=100)
-    mr = adata.uns['moranI']
+    # Workaround: anndata view → concrete copy avoids SparseCSCView import error
+    # in squidpy with newer anndata versions
+    adata_sq = adata.copy()
+    if 'spatial_neighbors' not in adata_sq.uns:
+        sq.gr.spatial_neighbors(adata_sq, coord_type='generic', n_neighs=6)
+    n_test = min(2000, adata_sq.shape[1])
+    sq.gr.spatial_autocorr(adata_sq, mode='moran', genes=adata_sq.var_names[:n_test], n_perms=100)
+    mr = adata_sq.uns['moranI']
     if 'gene' not in mr.columns: mr = mr.copy(); mr['gene'] = mr.index
     gene_col = 'gene' if 'gene' in mr.columns else 'genes'
     print(mr.nsmallest(20,'pval_norm')[['I','pval_norm',gene_col]])
     mr.to_csv(R('spatially_variable_genes_moran.csv'))
-except Exception as e: print(f"Moran error: {e}")
+    del adata_sq
+except ImportError:
+    print("squidpy not installed — falling back to numpy Moran's I")
+    mr = None
+except Exception as e:
+    print(f"squidpy Moran error ({e}) — falling back to numpy Moran's I")
+    mr = None
+
+if mr is None:
+    # Pure-numpy Moran's I (no squidpy dependency)
+    from sklearn.neighbors import NearestNeighbors
+    print("Computing Moran's I via numpy fallback...")
+    nn_m = NearestNeighbors(n_neighbors=6).fit(coords)
+    _, idx_m = nn_m.kneighbors(coords)
+    n_spots = coords.shape[0]
+    # Sparse row-normalised weight matrix
+    rows = np.repeat(np.arange(n_spots), 6)
+    cols = idx_m[:, 1:].flatten() if idx_m.shape[1] > 1 else idx_m.flatten()
+    cols = idx_m.reshape(-1) if idx_m.shape[1] == 6 else idx_m[:, 1:].reshape(-1)
+    from scipy.sparse import csr_matrix
+    W = csr_matrix((np.ones(len(rows)), (rows, cols[:len(rows)])), shape=(n_spots, n_spots))
+    W = W.multiply(1.0 / np.array(W.sum(axis=1)))   # row-normalise
+    n_genes_m = min(3000, adata.shape[1])
+    moran_stats = []
+    X_m = adata.X[:, :n_genes_m]
+    if hasattr(X_m, 'toarray'): X_m = X_m.toarray()
+    for gi in range(X_m.shape[1]):
+        x = X_m[:, gi].astype(float)
+        xc = x - x.mean()
+        denom = (xc**2).sum()
+        if denom == 0:
+            moran_stats.append(0.0); continue
+        Wx = np.asarray(W.dot(xc)).flatten()
+        I = n_spots / W.sum() * (xc * Wx).sum() / denom
+        moran_stats.append(float(I))
+    mr_fb = pd.DataFrame({'gene': adata.var_names[:n_genes_m], 'I': moran_stats})
+    mr_fb = mr_fb.sort_values('I', ascending=False)
+    mr_fb.to_csv(R('spatially_variable_genes_moran.csv'), index=False)
+    print("Top spatially variable genes (numpy Moran's I):\n", mr_fb.head(20).to_string(index=False))
+    mr = mr_fb; gene_col = 'gene'
 
 # SPARK-X (memory-efficient)
 try:
@@ -1030,7 +1073,7 @@ for ax, col, title_ in zip(axes,
     except Exception:
         # fallback: plain scatter if sc.pl.spatial not available
         spatial_scatter(ax, coords, adata.obs[col].astype('category').cat.codes, title_)
-save_show(fig, R('spatial_domains_comparison.png')
+save_show(fig, R('spatial_domains_comparison.png'))
 
 sc.tl.rank_genes_groups(adata, 'spatial_domain_leiden', method='wilcoxon')
 sc.pl.rank_genes_groups_dotplot(adata, groupby='spatial_domain_leiden', n_genes=5)
@@ -1070,7 +1113,7 @@ if len(ctrl_idx) >= 2 and len(dis_idx) >= 2:
     ax.set(xlabel='log2FC', ylabel='-log10(adj p)'); ax.set_title('Disease vs Healthy Volcano')
     for _, row in de_df.nsmallest(10,'p_adj').iterrows():
         ax.annotate(row['gene'], (row['log2FC'], row['-log10p']), fontsize=8)
-    save_show(fig, R('disease_vs_healthy_volcano.png')
+    save_show(fig, R('disease_vs_healthy_volcano.png'))
 
 if len(adata.obs['condition'].unique()) >= 2:
     sc.tl.rank_genes_groups(adata, 'condition', groups=['Disease'], reference='Control', method='wilcoxon')
@@ -1108,7 +1151,7 @@ try:
     sq.gr.nhood_enrichment(adata, cluster_key='cell_type')
     fig, ax = plt.subplots(figsize=(10,8))
     sq.pl.nhood_enrichment(adata, cluster_key='cell_type', ax=ax)
-    save_show(fig, R('neighborhood_enrichment.png')
+    save_show(fig, R('neighborhood_enrichment.png'))
 
     lr_pairs = [('NGF','NGFR'),('BDNF','NTRK2'),('FGF2','FGFR1'),('NLGN1','NRXN1'),('CNTF','CNTFR')]
     interactions = []
@@ -1131,7 +1174,7 @@ try:
         ax.barh(range(len(top15)), top15['score'])
         ax.set_yticks(range(len(top15)))
         ax.set_yticklabels([f"{r['sender']}→{r['receiver']}: {r['L']}-{r['R']}" for _,r in top15.iterrows()])
-        ax.set_title('Top Cell-Cell Interactions'); save_show(fig, R('cell_cell_interactions.png')
+        ax.set_title('Top Cell-Cell Interactions'); save_show(fig, R('cell_cell_interactions.png'))
 
     # Motor-Fibro proximity
     from scipy.spatial import cKDTree
@@ -1152,7 +1195,7 @@ try:
     axes[1].scatter(coords[int_m,0], coords[int_m,1], c='red',  s=10, alpha=0.8, label='Interacting Motor')
     axes[1].scatter(coords[int_f,0], coords[int_f,1], c='blue', s=10, alpha=0.8, label='Interacting Fibro')
     axes[1].set_title('Motor-Fibro Interactions (<50px)'); axes[1].legend()
-    save_show(fig, R('motor_fibroblast_interactions.png')
+    save_show(fig, R('motor_fibroblast_interactions.png'))
 except Exception as e: print(f"CCI error: {e}")
 
 # ── STEP 31: Spatial neighborhood analysis ────────────────────
@@ -1162,13 +1205,13 @@ try:
     sq.gr.nhood_enrichment(adata, cluster_key='leiden_neuronal')
     fig, ax = plt.subplots(figsize=(10,8))
     sq.pl.nhood_enrichment(adata, cluster_key='leiden_neuronal', ax=ax)
-    save_show(fig, R('neighborhood_enrichment_heatmap.png')
+    save_show(fig, R('neighborhood_enrichment_heatmap.png'))
     sq.gr.co_occurrence(adata, cluster_key='leiden_neuronal')
     if top_motor_cluster and top_fibro_cluster:
         fig, axes = plt.subplots(1,2,figsize=(14,5))
         sq.pl.co_occurrence(adata, cluster_key='leiden_neuronal', clusters=[top_motor_cluster], ax=axes[0])
         sq.pl.co_occurrence(adata, cluster_key='leiden_neuronal', clusters=[top_fibro_cluster],  ax=axes[1])
-        save_show(fig, R('co_occurrence_patterns.png')
+        save_show(fig, R('co_occurrence_patterns.png'))
     # Spatial niches
     nb_mat = adata.obsp['spatial_connectivities']
     n_cl = len(adata.obs['leiden_neuronal'].unique())
@@ -1182,7 +1225,7 @@ try:
     fig, axes = plt.subplots(1,2,figsize=(14,6))
     sc.pl.spatial(adata, color='spatial_niche',      ax=axes[0], show=False, spot_size=50)
     sc.pl.spatial(adata, color='leiden_neuronal',    ax=axes[1], show=False, spot_size=50)
-    save_show(fig, R('spatial_niches.png')
+    save_show(fig, R('spatial_niches.png'))
     nc = pd.crosstab(adata.obs['spatial_niche'], adata.obs['leiden_neuronal'])
     (nc.div(nc.sum(axis=1), axis=0)*100).round(1).to_csv(R('niche_composition.csv'))
     sc.tl.rank_genes_groups(adata, 'spatial_niche', method='wilcoxon')
@@ -1194,7 +1237,7 @@ step(32, "BATCH CORRECTION")
 fig, axes = plt.subplots(1,2,figsize=(14,6))
 sc.pl.umap(adata, color='organoid',        ax=axes[0], show=False, title='Before: by Organoid')
 sc.pl.umap(adata, color='leiden_neuronal', ax=axes[1], show=False, title='Before: by Cluster')
-save_show(fig, R('batch_effects_before.png')
+save_show(fig, R('batch_effects_before.png'))
 
 for method, pkg, install in [('Harmony','harmonypy','pip install harmonypy'),
                                ('BBKNN','bbknn','pip install bbknn')]:
@@ -1217,7 +1260,7 @@ for method, pkg, install in [('Harmony','harmonypy','pip install harmonypy'),
         fig, axes = plt.subplots(1,2,figsize=(14,6))
         sc.pl.umap(adata, color='organoid',  ax=axes[0], show=False, title=f'{method}: by Organoid')
         sc.pl.umap(adata, color=key_added,   ax=axes[1], show=False, title=f'{method}: by Cluster')
-        save_show(fig, R(f'batch_effects_after_{method.lower()}.png')
+        save_show(fig, R(f'batch_effects_after_{method.lower()}.png'))
     except ImportError: print(f"{method} not installed: {install}")
     except Exception as e: print(f"{method} error: {e}")
 
@@ -1250,7 +1293,7 @@ if key_ct and 'spatial' in adata.obsm:
     for ax, ct in zip(axes, key_ct):
         sc_ = spatial_scatter(ax, coords, prop_df[ct].values, f'{ct} Proportion', cmap='Reds', vmin=0, vmax=1)
         plt.colorbar(sc_, ax=ax)
-    save_show(fig, R('spot_deconvolution.png')
+    save_show(fig, R('spot_deconvolution.png'))
 
 # ── STEP 34: Spatial trajectories ────────────────────────────
 step(34, "SPATIAL TRAJECTORY ANALYSIS")
@@ -1274,7 +1317,7 @@ sc.pl.umap(adata, color='radial_pseudotime', ax=axes[1], show=False, cmap='virid
 for cl in list(adata.obs['leiden_neuronal'].unique())[:5]:
     axes[2].hist(adata.obs.loc[adata.obs['leiden_neuronal']==cl,'radial_pseudotime'], bins=30, alpha=0.5, label=cl)
 axes[2].set(xlabel='Pseudotime', ylabel='Count'); axes[2].legend()
-save_show(fig, R('radial_pseudotime.png')
+save_show(fig, R('radial_pseudotime.png'))
 
 pt_corr = []
 for i in range(min(500, adata.shape[1])):
