@@ -390,7 +390,7 @@ try:
     top20 = mr.nsmallest(20, 'pval_norm'); print(top20[['I','pval_norm',gene_col]])
     mr.to_csv(R('spatially_variable_genes.csv'))
     fig, axes = plt.subplots(2,3,figsize=(21,14)); axes = axes.flatten()
-    for i, gene in enumerate(top20[gene_col].tolist()[:6]):
+    for i, gene in enumerate(top20[gene_col]):
         if gene in adata.var_names:
             e = get_exp(adata, gene)
             sc_ = axes[i].scatter(coords[:,0], coords[:,1], c=e, cmap='viridis', s=3, alpha=0.7)
@@ -640,7 +640,6 @@ if subtype_scores_d:
     if top_motor_cluster in pivot_scores.index:
         dom = pivot_scores.loc[top_motor_cluster].sort_values(ascending=False)
         print(f"Motor cluster dominant subtype: {dom.index[0]} ({dom.iloc[0]:.4f})")
-    # Heatmap
     fig, ax = plt.subplots(figsize=(14,8))
     im = ax.imshow(pivot_scores.T, cmap='viridis', aspect='auto')
     ax.set_xticks(range(len(pivot_scores))); ax.set_xticklabels(pivot_scores.index, rotation=45, ha='right')
@@ -828,23 +827,18 @@ for org in organoids:
     om = adata.obs['organoid'] == org; sub = adata[om].copy()
     if sub.shape[0] < 10: continue
     fig, axes = plt.subplots(1, 2, figsize=(20, 8))
-
-    # Left: leiden_neuronal clusters
     sc.pl.umap(sub, color='leiden_neuronal', ax=axes[0], show=False,
-               title=f'{org} – Clusters', legend_loc='on data', legend_fontsize=8)
-
-    # Right: cell types (custom colours)
+               title=f'{org} - Clusters', legend_loc='on data', legend_fontsize=8)
     for ct in sub.obs['cell_type'].unique():
         m = sub.obs['cell_type'] == ct
         axes[1].scatter(sub.obsm['X_umap'][m,0], sub.obsm['X_umap'][m,1],
                         c=ct_color_map[ct], s=10, alpha=0.8, label=ct, edgecolors='none')
-    axes[1].set_title(f'{org} – Cell Types', fontsize=14, fontweight='bold')
+    axes[1].set_title(f'{org} - Cell Types', fontsize=14, fontweight='bold')
     axes[1].set_xticks([]); axes[1].set_yticks([])
     axes[1].legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=9)
-
     save_show(fig, R(f'umap_{org}_colored.png'), dpi=300)
 
-# ── Side-by-side: CLUSTERS ──
+# Side-by-side: CLUSTERS
 fig, axes = plt.subplots(2, 2, figsize=(20, 18)); axes = axes.flatten()
 for i, org in enumerate(organoids[:4]):
     om = adata.obs['organoid'] == org; sub = adata[om].copy()
@@ -855,7 +849,7 @@ for i, org in enumerate(organoids[:4]):
 plt.suptitle('Clusters Across Organoids', fontsize=18, fontweight='bold', y=1.01)
 save_show(fig, R('umap_all_organoids_clusters.png'), dpi=300)
 
-# ── Side-by-side: CELL TYPES ──
+# Side-by-side: CELL TYPES
 fig, axes = plt.subplots(2, 2, figsize=(20, 18)); axes = axes.flatten()
 for i, org in enumerate(organoids[:4]):
     om = adata.obs['organoid'] == org; sub = adata[om].copy()
@@ -898,25 +892,21 @@ from sklearn.decomposition import PCA
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 import networkx as nx
 
-# Cell type composition
 comp_rows = [{'organoid': org,
               **{ct: pct for ct, pct in (adata.obs[adata.obs['organoid']==org]['cell_type'].value_counts(normalize=True)*100).items()}}
              for org in organoids]
 comp_df = pd.DataFrame(comp_rows).fillna(0); comp_df.to_csv(R('organoid_cell_type_composition.csv'), index=False)
 
-# Marker expression profiles
 expr_rows = [{'organoid': org,
               **{f"{ct}_{mk}": get_exp(adata[adata.obs['organoid']==org], mk).mean()
                  for ct, mks in ct_marker_map.items() for mk in mks if mk in adata.var_names}}
              for org in organoids]
 marker_df = pd.DataFrame(expr_rows).fillna(0); marker_df.to_csv(R('organoid_marker_expression.csv'), index=False)
 
-# Global correlations
 profiles = [np.asarray(adata[adata.obs['organoid']==org].X.mean(axis=0)).flatten() for org in organoids]
 corr_df = pd.DataFrame(np.corrcoef(profiles), index=organoids, columns=organoids)
 print("Global expression correlation:\n", corr_df.round(3))
 
-# Multi-dimensional similarity
 all_feats = pd.concat([comp_df.drop('organoid',axis=1), marker_df.drop('organoid',axis=1)], axis=1)
 fs = StandardScaler().fit_transform(all_feats)
 ed = euclidean_distances(fs); md = manhattan_distances(fs); cs = cosine_similarity(fs)
@@ -937,7 +927,6 @@ ax.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)')
 ax.set_title('PCA of Organoids'); ax.grid(alpha=0.3)
 save_show(fig, R('organoid_comprehensive_pca.png'))
 
-# Combined similarity + ranking
 norm_dist = (ed/ed.max() + md/md.max() + (1-cs)/1) / 3
 np.fill_diagonal(norm_dist, np.inf)
 pairs_df = pd.DataFrame([{'pair': f"{organoids[i]} - {organoids[j]}",
@@ -948,12 +937,12 @@ print("\nSimilarity ranking:\n", pairs_df.to_string(index=False))
 print(f"\n✅ MOST SIMILAR: {pairs_df.iloc[0]['pair']}")
 print(f"📉 LEAST SIMILAR: {pairs_df.iloc[-1]['pair']}")
 
-# ── STEP 26: SVG detection (multi-method) ─────────────────────
+# ── STEP 26: SVG detection ────────────────────────────────────
 step(26, "SPATIALLY VARIABLE GENE DETECTION (Multi-method)")
+mr = None; gene_col = 'gene'
 try:
     import squidpy as sq
-    # Workaround: anndata view → concrete copy avoids SparseCSCView import error
-    # in squidpy with newer anndata versions
+    # adata.copy() avoids SparseCSCView incompatibility with newer anndata
     adata_sq = adata.copy()
     if 'spatial_neighbors' not in adata_sq.uns:
         sq.gr.spatial_neighbors(adata_sq, coord_type='generic', n_neighs=6)
@@ -966,46 +955,36 @@ try:
     mr.to_csv(R('spatially_variable_genes_moran.csv'))
     del adata_sq
 except ImportError:
-    print("squidpy not installed — falling back to numpy Moran's I")
-    mr = None
+    print("squidpy not installed — falling back to numpy Moran's I"); mr = None
 except Exception as e:
-    print(f"squidpy Moran error ({e}) — falling back to numpy Moran's I")
-    mr = None
+    print(f"squidpy Moran error ({e}) — falling back to numpy Moran's I"); mr = None
 
 if mr is None:
-    # Pure-numpy Moran's I (no squidpy dependency)
-    from sklearn.neighbors import NearestNeighbors
+    from sklearn.neighbors import NearestNeighbors as _NNM
+    from scipy.sparse import csr_matrix as _csr
     print("Computing Moran's I via numpy fallback...")
-    nn_m = NearestNeighbors(n_neighbors=6).fit(coords)
-    _, idx_m = nn_m.kneighbors(coords)
-    n_spots = coords.shape[0]
-    # Sparse row-normalised weight matrix
-    rows = np.repeat(np.arange(n_spots), 6)
-    cols = idx_m[:, 1:].flatten() if idx_m.shape[1] > 1 else idx_m.flatten()
-    cols = idx_m.reshape(-1) if idx_m.shape[1] == 6 else idx_m[:, 1:].reshape(-1)
-    from scipy.sparse import csr_matrix
-    W = csr_matrix((np.ones(len(rows)), (rows, cols[:len(rows)])), shape=(n_spots, n_spots))
-    W = W.multiply(1.0 / np.array(W.sum(axis=1)))   # row-normalise
-    n_genes_m = min(3000, adata.shape[1])
-    moran_stats = []
-    X_m = adata.X[:, :n_genes_m]
-    if hasattr(X_m, 'toarray'): X_m = X_m.toarray()
-    for gi in range(X_m.shape[1]):
-        x = X_m[:, gi].astype(float)
-        xc = x - x.mean()
-        denom = (xc**2).sum()
-        if denom == 0:
-            moran_stats.append(0.0); continue
-        Wx = np.asarray(W.dot(xc)).flatten()
-        I = n_spots / W.sum() * (xc * Wx).sum() / denom
-        moran_stats.append(float(I))
-    mr_fb = pd.DataFrame({'gene': adata.var_names[:n_genes_m], 'I': moran_stats})
-    mr_fb = mr_fb.sort_values('I', ascending=False)
-    mr_fb.to_csv(R('spatially_variable_genes_moran.csv'), index=False)
-    print("Top spatially variable genes (numpy Moran's I):\n", mr_fb.head(20).to_string(index=False))
-    mr = mr_fb; gene_col = 'gene'
+    _nn = _NNM(n_neighbors=6).fit(coords)
+    _, _idx = _nn.kneighbors(coords)
+    _n = coords.shape[0]
+    _k = _idx.shape[1]                        # actual number of neighbours returned
+    _rows = np.repeat(np.arange(_n), _k)
+    _cols = _idx.reshape(-1)                   # all k neighbours, no self-index to skip
+    _W = _csr((np.ones(len(_rows)), (_rows, _cols)), shape=(_n, _n))
+    _W = _W.multiply(1.0 / np.array(_W.sum(axis=1)))
+    _ng = min(3000, adata.shape[1]); _Xm = adata.X[:, :_ng]
+    if hasattr(_Xm, 'toarray'): _Xm = _Xm.toarray()
+    _mi = []
+    for _gi in range(_Xm.shape[1]):
+        _x = _Xm[:, _gi].astype(float); _xc = _x - _x.mean(); _den = (_xc**2).sum()
+        if _den == 0: _mi.append(0.0); continue
+        _Wx = np.asarray(_W.dot(_xc)).flatten()
+        _mi.append(float(_n / _W.sum() * (_xc * _Wx).sum() / _den))
+    mr = pd.DataFrame({'gene': adata.var_names[:_ng], 'I': _mi}).sort_values('I', ascending=False)
+    mr.to_csv(R('spatially_variable_genes_moran.csv'), index=False)
+    print("Top SVGs (numpy Moran's I):\n", mr.head(20).to_string(index=False))
+    gene_col = 'gene'
 
-# SPARK-X (memory-efficient)
+# SPARK-X
 try:
     from scipy.stats import chi2
     def sparkx_test(expr, coords, n_sample=5000):
@@ -1063,7 +1042,6 @@ sc.tl.leiden(adata, resolution=0.5, key_added='spatial_domain_leiden')
 print(f"Louvain domains: {len(adata.obs['spatial_domain_louvain'].unique())}  "
       f"Leiden domains: {len(adata.obs['spatial_domain_leiden'].unique())}")
 
-# Always plot the 3-panel comparison (does not require squidpy)
 fig, axes = plt.subplots(1, 3, figsize=(18, 6))
 for ax, col, title_ in zip(axes,
     ['spatial_domain_louvain', 'spatial_domain_leiden', 'leiden'],
@@ -1071,7 +1049,6 @@ for ax, col, title_ in zip(axes,
     try:
         sc.pl.spatial(adata, color=col, ax=ax, show=False, title=title_, spot_size=50)
     except Exception:
-        # fallback: plain scatter if sc.pl.spatial not available
         spatial_scatter(ax, coords, adata.obs[col].astype('category').cat.codes, title_)
 save_show(fig, R('spatial_domains_comparison.png'))
 
@@ -1084,7 +1061,6 @@ disease_map = {'Organoid_1':'Control','Organoid_2':'Control','Organoid_3':'Disea
 adata.obs['condition'] = adata.obs['organoid'].map(disease_map).fillna('Unknown')
 print(adata.obs['condition'].value_counts())
 
-# Pseudobulk DE
 pb_means = {org: np.asarray(adata[adata.obs['organoid']==org].X.mean(axis=0)).flatten()
             for org in organoids}
 pb_conditions = {org: adata.obs.loc[adata.obs['organoid']==org,'condition'].iloc[0] for org in organoids}
@@ -1122,7 +1098,7 @@ if len(adata.obs['condition'].unique()) >= 2:
     pd.DataFrame({'gene': rs['names']['Disease'], 'log2FC': rs['logfoldchanges']['Disease'],
                   'p_adj': rs['pvals_adj']['Disease']}).to_csv(R('disease_vs_healthy_scranpy.csv'), index=False)
 
-# ── STEP 29: Pathway enrichment (full) ────────────────────────
+# ── STEP 29: Pathway enrichment ───────────────────────────────
 step(29, "PATHWAY ENRICHMENT")
 if GSEAPY_AVAILABLE:
     gene_sets = ['GO_Biological_Process_2023','KEGG_2021_Human','Reactome_2022']
@@ -1176,7 +1152,6 @@ try:
         ax.set_yticklabels([f"{r['sender']}→{r['receiver']}: {r['L']}-{r['R']}" for _,r in top15.iterrows()])
         ax.set_title('Top Cell-Cell Interactions'); save_show(fig, R('cell_cell_interactions.png'))
 
-    # Motor-Fibro proximity
     from scipy.spatial import cKDTree
     mt = cKDTree(coords[motor_mask]); ft = cKDTree(coords[fibro_mask])
     nearby = mt.query_ball_tree(ft, 50)
@@ -1212,7 +1187,6 @@ try:
         sq.pl.co_occurrence(adata, cluster_key='leiden_neuronal', clusters=[top_motor_cluster], ax=axes[0])
         sq.pl.co_occurrence(adata, cluster_key='leiden_neuronal', clusters=[top_fibro_cluster],  ax=axes[1])
         save_show(fig, R('co_occurrence_patterns.png'))
-    # Spatial niches
     nb_mat = adata.obsp['spatial_connectivities']
     n_cl = len(adata.obs['leiden_neuronal'].unique())
     nbcomp = np.zeros((adata.shape[0], n_cl))
